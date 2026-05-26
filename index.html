@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>지원금 매칭 MVP</title>
+    <meta
+      name="description"
+      content="예비창업자와 기존 사업자를 위한 대한민국 정책자금 및 지원사업 맞춤 추천 웹앱"
+    />
+    <meta name="theme-color" content="#107c63" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <aside class="profile-panel" aria-label="사업자 유형 선택">
+          <div class="brand-row">
+            <div class="brand-mark">₩</div>
+            <div>
+              <p class="eyebrow">Korea Funding Matcher</p>
+              <h1>사업자 맞춤 지원사업</h1>
+            </div>
+          </div>
+
+          <div class="path-selector" role="radiogroup" aria-label="사용자 유형">
+            <button class="path-card active" type="button" data-path="founder" aria-pressed="true">
+              <span>예비창업자</span>
+              <strong>아직 사업자등록 전이에요</strong>
+            </button>
+            <button class="path-card" type="button" data-path="business" aria-pressed="false">
+              <span>기존 사업자</span>
+              <strong>사업자등록증으로 찾을게요</strong>
+            </button>
+          </div>
+
+          <form id="businessForm" class="form-grid founder-mode">
+            <section class="form-section founder-fields">
+              <div class="section-title">
+                <p class="eyebrow">예비창업자 정보</p>
+                <h2>창업 예정 조건</h2>
+              </div>
+              <label>
+                창업 예정 지역
+                <select name="region">
+                  <option>서울</option>
+                  <option>경기</option>
+                  <option>인천</option>
+                  <option>부산</option>
+                  <option>대구</option>
+                  <option>광주</option>
+                  <option>대전</option>
+                  <option>울산</option>
+                  <option>세종</option>
+                  <option>강원</option>
+                  <option>충북</option>
+                  <option>충남</option>
+                  <option>전북</option>
+                  <option>전남</option>
+                  <option>경북</option>
+                  <option>경남</option>
+                  <option>제주</option>
+                </select>
+              </label>
+              <label>
+                창업 예정 업종
+                <select name="industry">
+                  <option value="음식점업">음식점업</option>
+                  <option value="도소매업">도소매업</option>
+                  <option value="제조업">제조업</option>
+                  <option value="IT/소프트웨어">IT/소프트웨어</option>
+                  <option value="콘텐츠">콘텐츠</option>
+                  <option value="서비스업">서비스업</option>
+                </select>
+              </label>
+              <label>
+                예상 연 매출
+                <select name="revenue">
+                  <option value="1">1억 이하</option>
+                  <option value="3" selected>3억 이하</option>
+                  <option value="10">10억 이하</option>
+                  <option value="50">50억 이하</option>
+                  <option value="999">50억 초과</option>
+                </select>
+              </label>
+              <label>
+                예상 고용 규모
+                <select name="employees">
+                  <option value="0">1인 창업</option>
+                  <option value="4" selected>5명 미만</option>
+                  <option value="9">10명 미만</option>
+                  <option value="49">50명 미만</option>
+                  <option value="100">50명 이상</option>
+                </select>
+              </label>
+              <label>
+                대표자 연령대
+                <select name="ownerAge">
+                  <option value="24">20대</option>
+                  <option value="34" selected>30대</option>
+                  <option value="44">40대</option>
+                  <option value="54">50대</option>
+                  <option value="64">60대 이상</option>
+                </select>
+              </label>
+            </section>
+
+            <section class="form-section business-fields" hidden>
+              <div class="section-title">
+                <p class="eyebrow">기존 사업자 정보</p>
+                <h2>사업자등록증 업로드</h2>
+              </div>
+              <label class="upload-card" for="certificate">
+                <span class="upload-icon">+</span>
+                <span>
+                  <strong>사업자등록증 선택</strong>
+                  <small id="fileName">이미지 파일을 올리면 정보를 읽어옵니다.</small>
+                </span>
+              </label>
+              <input id="certificate" type="file" accept="image/*" />
+              <div id="ocrStatus" class="ocr-note">
+                JPG, PNG 같은 이미지 형식의 사업자등록증을 올려주세요.
+              </div>
+              <dl id="extractedInfo" class="extracted-info" hidden></dl>
+            </section>
+
+            <div class="toggle-group founder-only">
+              <label><input name="exports" type="checkbox" /> 수출 예정</label>
+              <label><input name="femaleOwned" type="checkbox" /> 여성 대표</label>
+              <label><input name="startup" type="checkbox" checked /> 창업기업</label>
+              <label><input name="venture" type="checkbox" /> 기술/벤처형</label>
+            </div>
+
+            <button type="submit">맞춤 지원사업 찾기</button>
+          </form>
+        </aside>
+
+        <section class="results-panel" aria-live="polite">
+          <header class="results-header">
+            <div>
+              <p class="eyebrow">추천 결과</p>
+              <h2 id="summaryTitle">한빛상점에 맞는 지원사업 0건</h2>
+            </div>
+            <select id="sortMode" aria-label="정렬">
+              <option value="score">적합도순</option>
+              <option value="deadline">마감 임박순</option>
+              <option value="amount">지원 규모순</option>
+            </select>
+          </header>
+
+          <div class="insight-strip">
+            <div>
+              <span id="topScore">0%</span>
+              <small>최고 적합도</small>
+            </div>
+            <div>
+              <span id="urgentCount">0</span>
+              <small>14일 내 마감</small>
+            </div>
+            <div>
+              <span id="loanCount">0</span>
+              <small>정책자금/융자</small>
+            </div>
+          </div>
+
+          <div id="resultList" class="result-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="programCard">
+      <article class="program-card">
+        <div class="card-topline">
+          <span class="tag"></span>
+          <span class="deadline"></span>
+        </div>
+        <h3></h3>
+        <p class="agency"></p>
+        <p class="description"></p>
+        <div class="score-row">
+          <div class="score-bar"><span></span></div>
+          <strong class="score-label"></strong>
+        </div>
+        <dl class="program-meta"></dl>
+        <div class="reason-box"></div>
+        <div class="card-actions">
+          <a target="_blank" rel="noreferrer">공고 보기</a>
+          <button type="button">관심사업 저장</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
