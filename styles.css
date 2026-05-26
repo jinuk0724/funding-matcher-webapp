@@ -328,6 +328,22 @@ form button {
   word-break: keep-all;
 }
 
+.business-confirm {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.business-confirm[hidden] {
+  display: none;
+}
+
+.business-flags {
+  grid-column: 1 / -1;
+}
+
 .business-mode .founder-fields,
 .business-mode .founder-only {
   display: none;
@@ -387,6 +403,28 @@ form button {
   border-radius: 8px;
   padding: 18px;
   background: #fff;
+}
+
+.program-card.needs-review {
+  border-color: #e8c06c;
+}
+
+.program-card.needs-review .tag {
+  background: #fff3de;
+  color: var(--amber);
+}
+
+.program-card.not-eligible {
+  opacity: 0.72;
+}
+
+.program-card.not-eligible .tag {
+  background: #ffe8ea;
+  color: var(--rose);
+}
+
+.program-card.not-eligible .score-bar span {
+  background: var(--rose);
 }
 
 .empty-state {
@@ -567,7 +605,8 @@ form button {
   .toggle-group,
   .insight-strip,
   .program-meta,
-  .extracted-info {
+  .extracted-info,
+  .business-confirm {
     grid-template-columns: 1fr;
   }
 

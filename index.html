@@ -124,6 +124,49 @@
                 JPG, PNG 같은 이미지 형식의 사업자등록증을 올려주세요.
               </div>
               <dl id="extractedInfo" class="extracted-info" hidden></dl>
+              <div id="businessConfirm" class="business-confirm" hidden>
+                <label>
+                  인식된 지역
+                  <select id="confirmRegion">
+                    <option value="">인식 필요</option>
+                    <option>서울</option>
+                    <option>경기</option>
+                    <option>인천</option>
+                    <option>부산</option>
+                    <option>대구</option>
+                    <option>광주</option>
+                    <option>대전</option>
+                    <option>울산</option>
+                    <option>세종</option>
+                    <option>강원</option>
+                    <option>충북</option>
+                    <option>충남</option>
+                    <option>전북</option>
+                    <option>전남</option>
+                    <option>경북</option>
+                    <option>경남</option>
+                    <option>제주</option>
+                  </select>
+                </label>
+                <label>
+                  인식된 업종
+                  <select id="confirmIndustry">
+                    <option value="">인식 필요</option>
+                    <option value="음식점업">음식점업</option>
+                    <option value="도소매업">도소매업</option>
+                    <option value="제조업">제조업</option>
+                    <option value="IT/소프트웨어">IT/소프트웨어</option>
+                    <option value="콘텐츠">콘텐츠</option>
+                    <option value="서비스업">서비스업</option>
+                  </select>
+                </label>
+                <div class="toggle-group business-flags">
+                  <label><input id="confirmYouth" type="checkbox" /> 청년 대표 해당</label>
+                  <label><input id="confirmFemale" type="checkbox" /> 여성기업 해당</label>
+                  <label><input id="confirmExport" type="checkbox" /> 수출기업 해당</label>
+                  <label><input id="confirmStartup" type="checkbox" /> 창업 7년 이내</label>
+                </div>
+              </div>
             </section>
 
             <div class="toggle-group founder-only">
