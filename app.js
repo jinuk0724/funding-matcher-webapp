@@ -451,6 +451,16 @@ function renderUploadPrompt() {
   resultList.appendChild(prompt);
 }
 
+function renderNoEligiblePrograms() {
+  const prompt = document.createElement("article");
+  prompt.className = "empty-state";
+  prompt.innerHTML = `
+    <strong>현재 조건에 맞는 지원사업이 없습니다.</strong>
+    <span>대상 조건이 맞지 않는 사업은 숨겼습니다. 지역, 업종, 청년/여성기업/수출기업 여부를 다시 확인해보세요.</span>
+  `;
+  resultList.appendChild(prompt);
+}
+
 function matchProgram(profile, program) {
   const checks = [
     makeCheck("region", "지역", profile.region, program.regions, 24, true),
@@ -554,7 +564,8 @@ function makeBooleanCheck(key, label, value, requiredValue, weight) {
 }
 
 function renderMatches(companyName = getProfile().companyName) {
-  const sorted = [...state.matches].sort((a, b) => {
+  const visibleMatches = state.matches.filter((program) => program.status !== "not_eligible");
+  const sorted = [...visibleMatches].sort((a, b) => {
     if (state.sortMode === "deadline") return a.daysLeft - b.daysLeft;
     if (state.sortMode === "amount") return b.amount - a.amount;
     if (a.status !== b.status) return statusRank(a.status) - statusRank(b.status);
@@ -562,13 +573,17 @@ function renderMatches(companyName = getProfile().companyName) {
   });
 
   resultList.replaceChildren();
-  sorted.forEach((program) => resultList.appendChild(createProgramCard(program)));
+  if (sorted.length === 0) {
+    renderNoEligiblePrograms();
+  } else {
+    sorted.forEach((program) => resultList.appendChild(createProgramCard(program)));
+  }
 
   const available = sorted.filter((program) => program.status === "eligible" && program.score >= 70);
   summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건`;
   document.querySelector("#topScore").textContent = `${available[0]?.score || 0}%`;
   document.querySelector("#urgentCount").textContent = String(
-    sorted.filter((program) => program.status !== "not_eligible" && program.daysLeft >= 0 && program.daysLeft <= 14).length,
+    sorted.filter((program) => program.daysLeft >= 0 && program.daysLeft <= 14).length,
   );
   document.querySelector("#loanCount").textContent = String(
     available.filter((program) => program.type === "정책자금").length,
