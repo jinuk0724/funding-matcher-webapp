@@ -323,13 +323,31 @@ function parseBusinessCertificate(text) {
     /종\s*목\s*[:：]?\s*([^\n]+)/,
     /업\s*태\s*[:：]?\s*([^\n]+)/,
   ]);
+  const taxBusinessType = extractValue(text, [
+    /업\s*태\s*[:：]?\s*([^\n]+)/,
+    /업태\s*([^\n]+)/,
+  ]);
+  const taxBusinessItem = extractValue(text, [
+    /종\s*목\s*[:：]?\s*([^\n]+)/,
+    /종목\s*([^\n]+)/,
+  ]);
+  const corporateNumber = extractCorporateNumber(text);
+  const representativeBirthDate = extractRepresentativeBirthDate(text);
+  const businessType = corporateNumber || /법인등록번호|법인명|주식회사|\(주\)|법인사업자/.test(text)
+    ? "법인사업자"
+    : "개인사업자";
 
   return {
     companyName: cleanExtractedValue(companyName) || "업로드 사업자",
     businessNumber: cleanExtractedValue(businessNumber) || "인식 필요",
-    businessType: text.includes("법인") ? "법인사업자" : "개인사업자",
+    corporateNumber: corporateNumber || "해당 없음",
+    representativeBirthDate: representativeBirthDate || "인식 필요",
+    businessType,
     region: inferRegion(text),
     industry: inferIndustry(industryText || text),
+    taxBusinessType: cleanExtractedValue(taxBusinessType) || "인식 필요",
+    taxBusinessItem: cleanExtractedValue(taxBusinessItem) || "인식 필요",
+    taxIndustryRaw: makeTaxIndustryRaw(taxBusinessType, taxBusinessItem),
     openedAt: openedAt || "인식 필요",
     businessAgeYears,
     rawText: text,
@@ -350,6 +368,42 @@ function extractDateAfter(text) {
   if (!dateMatch) return "";
   const [, year, month, day] = dateMatch;
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function extractCorporateNumber(text) {
+  const match = text.match(/법인\s*등록\s*번호\s*[:：]?\s*([0-9]{6}\s*-?\s*[0-9]{7})/);
+  return match?.[1]?.replace(/\s/g, "") || "";
+}
+
+function extractRepresentativeBirthDate(text) {
+  const compact = text.replace(/\s+/g, " ");
+  const explicit = compact.match(/생\s*년\s*월\s*일\s*[:：]?\s*((?:19|20)?[0-9]{2}[.\-년\s]+[01]?[0-9][.\-월\s]+[0-3]?[0-9]|[0-9]{6})/);
+  if (explicit?.[1]) return normalizeBirthDate(explicit[1]);
+
+  const aroundRepresentative = compact.match(/대표자.{0,30}?((?:19|20)?[0-9]{2}[.\-년\s]+[01]?[0-9][.\-월\s]+[0-3]?[0-9]|[0-9]{6})/);
+  if (aroundRepresentative?.[1]) return normalizeBirthDate(aroundRepresentative[1]);
+
+  return "";
+}
+
+function normalizeBirthDate(value) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  }
+  if (digits.length === 6) {
+    const yy = Number(digits.slice(0, 2));
+    const prefix = yy > 30 ? "19" : "20";
+    return `${prefix}${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 6)}`;
+  }
+  return value.trim();
+}
+
+function makeTaxIndustryRaw(taxBusinessType, taxBusinessItem) {
+  const type = cleanExtractedValue(taxBusinessType);
+  const item = cleanExtractedValue(taxBusinessItem);
+  if (type && item) return `${type} / ${item}`;
+  return type || item || "인식 필요";
 }
 
 function yearsFrom(dateText) {
@@ -414,12 +468,19 @@ function syncBusinessConfirm(info) {
 
 function renderExtractedInfo(info) {
   extractedInfo.replaceChildren();
+  const identityRow =
+    info.businessType === "법인사업자"
+      ? ["법인등록번호", info.corporateNumber]
+      : ["대표자 생년월일", info.representativeBirthDate];
   [
     ["상호", info.companyName],
     ["사업자번호", info.businessNumber],
     ["유형", info.businessType],
+    identityRow,
     ["지역", info.region || "인식 필요"],
-    ["업종", info.industry || "인식 필요"],
+    ["국세청 업태", info.taxBusinessType],
+    ["국세청 종목", info.taxBusinessItem],
+    ["추천용 분류", info.industry || "인식 필요"],
     ["개업일", info.openedAt],
   ].forEach(([key, value]) => {
     const item = document.createElement("div");
