@@ -18,6 +18,27 @@ const REGIONS = [
   "제주",
 ];
 
+const TAX_TYPE_TO_INDUSTRY = {
+  "농업, 임업 및 어업": "서비스업",
+  광업: "제조업",
+  제조업: "제조업",
+  "전기, 가스, 증기 및 공기조절 공급업": "서비스업",
+  "수도, 하수 및 폐기물 처리, 원료 재생업": "서비스업",
+  건설업: "서비스업",
+  "도매 및 소매업": "도소매업",
+  "운수 및 창고업": "서비스업",
+  "숙박 및 음식점업": "음식점업",
+  정보통신업: "IT/소프트웨어",
+  "금융 및 보험업": "서비스업",
+  부동산업: "서비스업",
+  "전문, 과학 및 기술 서비스업": "서비스업",
+  "사업시설 관리, 사업 지원 및 임대 서비스업": "서비스업",
+  "교육 서비스업": "서비스업",
+  "보건업 및 사회복지 서비스업": "서비스업",
+  "예술, 스포츠 및 여가관련 서비스업": "콘텐츠",
+  "협회 및 단체, 수리 및 기타 개인 서비스업": "서비스업",
+};
+
 const supportPrograms = [
   {
     id: "seoul-small-2026",
@@ -147,6 +168,7 @@ const ocrStatus = document.querySelector("#ocrStatus");
 const extractedInfo = document.querySelector("#extractedInfo");
 const businessConfirm = document.querySelector("#businessConfirm");
 const confirmRegion = document.querySelector("#confirmRegion");
+const confirmTaxBusinessType = document.querySelector("#confirmTaxBusinessType");
 const confirmIndustry = document.querySelector("#confirmIndustry");
 const confirmOpenedAt = document.querySelector("#confirmOpenedAt");
 const confirmYouth = document.querySelector("#confirmYouth");
@@ -168,9 +190,12 @@ pathButtons.forEach((button) => {
   button.addEventListener("click", () => setUserPath(button.dataset.path));
 });
 
-[confirmRegion, confirmIndustry, confirmOpenedAt, confirmYouth, confirmFemale, confirmExport, confirmStartup].forEach(
+[confirmRegion, confirmTaxBusinessType, confirmIndustry, confirmOpenedAt, confirmYouth, confirmFemale, confirmExport, confirmStartup].forEach(
   (control) => {
     control.addEventListener("change", () => {
+      if (control === confirmTaxBusinessType && TAX_TYPE_TO_INDUSTRY[confirmTaxBusinessType.value]) {
+        confirmIndustry.value = TAX_TYPE_TO_INDUSTRY[confirmTaxBusinessType.value];
+      }
       if (state.userPath === "business" && state.extractedBusiness) {
         form.requestSubmit();
       }
@@ -394,6 +419,11 @@ function parseBusinessCertificate(text) {
   ]);
   const taxBusinessType = taxFields.type;
   const taxBusinessItem = taxFields.item;
+  const normalizedTaxBusinessType =
+    normalizeTaxBusinessType(taxBusinessType) ||
+    inferTaxBusinessType(`${taxBusinessType} ${taxBusinessItem} ${industryText} ${text}`);
+  const recommendedIndustry =
+    TAX_TYPE_TO_INDUSTRY[normalizedTaxBusinessType] || inferIndustry(industryText || text);
   const corporateNumber = extractCorporateNumber(text);
   const representativeBirthDate = extractRepresentativeBirthDate(text);
   const businessType = corporateNumber || /법인등록번호|법인명|주식회사|\(주\)|법인사업자/.test(text)
@@ -407,8 +437,8 @@ function parseBusinessCertificate(text) {
     representativeBirthDate: representativeBirthDate || "인식 필요",
     businessType,
     region: inferRegion(text),
-    industry: inferIndustry(industryText || text),
-    taxBusinessType: cleanExtractedValue(taxBusinessType) || "인식 필요",
+    industry: recommendedIndustry,
+    taxBusinessType: normalizedTaxBusinessType || cleanExtractedValue(taxBusinessType) || "인식 필요",
     taxBusinessItem: cleanExtractedValue(taxBusinessItem) || "인식 필요",
     taxIndustryRaw: makeTaxIndustryRaw(taxBusinessType, taxBusinessItem),
     openedAt: openedAt || "인식 필요",
@@ -555,6 +585,33 @@ function splitTaxIndustryLine(line) {
   return { type: "", item: cleaned };
 }
 
+function normalizeTaxBusinessType(value) {
+  const cleaned = cleanIndustryValue(value);
+  if (!cleaned) return "";
+
+  return Object.keys(TAX_TYPE_TO_INDUSTRY).find((type) => cleaned.includes(type)) || "";
+}
+
+function inferTaxBusinessType(text) {
+  const value = text.replace(/\s/g, "");
+  const rules = [
+    [/한의원|의원|병원|치과|한방|의료|보건|약국|치료|진료|요양|복지/, "보건업 및 사회복지 서비스업"],
+    [/음식|식당|카페|커피|제과|휴게|숙박|호텔|모텔|펜션/, "숙박 및 음식점업"],
+    [/도소매|소매|도매|판매|전자상거래|통신판매|쇼핑몰|유통/, "도매 및 소매업"],
+    [/제조|가공|공장|생산|인쇄|식품제조/, "제조업"],
+    [/소프트웨어|정보통신|개발|플랫폼|앱|웹|데이터|시스템/, "정보통신업"],
+    [/디자인|광고|컨설팅|연구|전문|기술|엔지니어링|세무|회계|법무/, "전문, 과학 및 기술 서비스업"],
+    [/학원|교육|교습|강의|훈련/, "교육 서비스업"],
+    [/부동산|임대|공인중개/, "부동산업"],
+    [/건설|인테리어|시공|공사/, "건설업"],
+    [/운수|택배|화물|창고|물류/, "운수 및 창고업"],
+    [/영상|콘텐츠|출판|미디어|공연|스포츠|여가|예술/, "예술, 스포츠 및 여가관련 서비스업"],
+    [/미용|세탁|수리|협회|단체|개인서비스/, "협회 및 단체, 수리 및 기타 개인 서비스업"],
+  ];
+  const matched = rules.find(([pattern]) => pattern.test(value));
+  return matched ? matched[1] : "";
+}
+
 function cleanIndustryValue(value) {
   return cleanExtractedValue(value)
     .replace(/업태|종목|주업태|주종목/g, "")
@@ -651,6 +708,9 @@ function cleanExtractedValue(value) {
 
 function syncBusinessConfirm(info) {
   confirmRegion.value = info.region || "";
+  confirmTaxBusinessType.value = Object.prototype.hasOwnProperty.call(TAX_TYPE_TO_INDUSTRY, info.taxBusinessType)
+    ? info.taxBusinessType
+    : "";
   confirmIndustry.value = info.industry || "";
   confirmOpenedAt.value = /^\d{4}-\d{2}-\d{2}$/.test(info.openedAt) ? info.openedAt : "";
   confirmStartup.checked = Boolean(info.businessAgeYears !== null && info.businessAgeYears <= 7);
