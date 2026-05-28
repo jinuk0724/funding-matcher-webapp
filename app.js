@@ -148,6 +148,7 @@ const extractedInfo = document.querySelector("#extractedInfo");
 const businessConfirm = document.querySelector("#businessConfirm");
 const confirmRegion = document.querySelector("#confirmRegion");
 const confirmIndustry = document.querySelector("#confirmIndustry");
+const confirmOpenedAt = document.querySelector("#confirmOpenedAt");
 const confirmYouth = document.querySelector("#confirmYouth");
 const confirmFemale = document.querySelector("#confirmFemale");
 const confirmExport = document.querySelector("#confirmExport");
@@ -167,7 +168,7 @@ pathButtons.forEach((button) => {
   button.addEventListener("click", () => setUserPath(button.dataset.path));
 });
 
-[confirmRegion, confirmIndustry, confirmYouth, confirmFemale, confirmExport, confirmStartup].forEach(
+[confirmRegion, confirmIndustry, confirmOpenedAt, confirmYouth, confirmFemale, confirmExport, confirmStartup].forEach(
   (control) => {
     control.addEventListener("change", () => {
       if (state.userPath === "business" && state.extractedBusiness) {
@@ -201,6 +202,8 @@ function getProfile() {
   if (state.userPath === "business") {
     const extracted = state.extractedBusiness || {};
     const isYouth = confirmYouth.checked;
+    const openedAt = confirmOpenedAt.value || null;
+    const businessAgeYears = openedAt ? yearsFrom(openedAt) : extracted.businessAgeYears;
 
     return {
       companyName: extracted.companyName || "업로드 사업자",
@@ -210,7 +213,7 @@ function getProfile() {
       revenue: null,
       employees: null,
       ownerAge: isYouth ? 34 : null,
-      businessAgeYears: confirmStartup.checked ? extracted.businessAgeYears || 2 : null,
+      businessAgeYears: confirmStartup.checked ? businessAgeYears : null,
       exports: confirmExport.checked,
       femaleOwned: confirmFemale.checked,
       startup: confirmStartup.checked,
@@ -319,18 +322,13 @@ function parseBusinessCertificate(text) {
     /등록\s*번호\s*[:：]?\s*([0-9]{3}\s*-?\s*[0-9]{2}\s*-?\s*[0-9]{5})/,
     /([0-9]{3}\s*-?\s*[0-9]{2}\s*-?\s*[0-9]{5})/,
   ]);
-  const industryText = extractValue(text, [
+  const taxFields = extractTaxIndustryFields(text);
+  const industryText = taxFields.item || taxFields.type || extractValue(text, [
     /종\s*목\s*[:：]?\s*([^\n]+)/,
     /업\s*태\s*[:：]?\s*([^\n]+)/,
   ]);
-  const taxBusinessType = extractValue(text, [
-    /업\s*태\s*[:：]?\s*([^\n]+)/,
-    /업태\s*([^\n]+)/,
-  ]);
-  const taxBusinessItem = extractValue(text, [
-    /종\s*목\s*[:：]?\s*([^\n]+)/,
-    /종목\s*([^\n]+)/,
-  ]);
+  const taxBusinessType = taxFields.type;
+  const taxBusinessItem = taxFields.item;
   const corporateNumber = extractCorporateNumber(text);
   const representativeBirthDate = extractRepresentativeBirthDate(text);
   const businessType = corporateNumber || /법인등록번호|법인명|주식회사|\(주\)|법인사업자/.test(text)
@@ -364,10 +362,118 @@ function extractValue(text, patterns) {
 
 function extractDateAfter(text) {
   const compact = text.replace(/\s+/g, " ");
-  const dateMatch = compact.match(/(20[0-9]{2}|19[0-9]{2})[.\-년\s]+([01]?[0-9])[.\-월\s]+([0-3]?[0-9])/);
-  if (!dateMatch) return "";
-  const [, year, month, day] = dateMatch;
+  const compactNoSpace = text.replace(/\s+/g, "");
+  const labeled = compact.match(/개\s*업\s*(?:연|년)?\s*월\s*일.{0,50}?((?:19|20)?[0-9]{2}[.\-/년\s]+[01]?[0-9][.\-/월\s]+[0-3]?[0-9]|[0-9]{8})/);
+  if (labeled?.[1]) return normalizeDate(labeled[1]);
+
+  const labeledNoSpace = compactNoSpace.match(/개업(?:연|년)?월일[:：]?((?:19|20)?[0-9]{2}[.\-/년]?[01]?[0-9][.\-/월]?[0-3]?[0-9])/);
+  if (labeledNoSpace?.[1]) return normalizeDate(labeledNoSpace[1]);
+
+  const lines = getCleanLines(text);
+  const labelIndex = lines.findIndex((line) => /개\s*업\s*(?:연|년)?\s*월\s*일/.test(line));
+  if (labelIndex >= 0) {
+    const nearby = lines.slice(labelIndex, labelIndex + 3).join(" ");
+    const nearbyDate = nearby.match(/((?:19|20)?[0-9]{2}[.\-/년\s]+[01]?[0-9][.\-/월\s]+[0-3]?[0-9]|[0-9]{8})/);
+    if (nearbyDate?.[1]) return normalizeDate(nearbyDate[1]);
+  }
+
+  return "";
+}
+
+function normalizeDate(value) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  }
+  if (digits.length === 6) {
+    const yy = Number(digits.slice(0, 2));
+    const prefix = yy > 30 ? "19" : "20";
+    return `${prefix}${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 6)}`;
+  }
+
+  const match = value.match(/((?:19|20)?[0-9]{2})\D+([01]?[0-9])\D+([0-3]?[0-9])/);
+  if (!match) return "";
+  const [, yearRaw, month, day] = match;
+  const year = yearRaw.length === 2 ? `${Number(yearRaw) > 30 ? "19" : "20"}${yearRaw}` : yearRaw;
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function extractTaxIndustryFields(text) {
+  const lines = getCleanLines(text);
+  const joined = lines.join("\n");
+
+  const sameLine = joined.match(/업\s*태\s*[:：]?\s*([^\n:：]{1,30}?)\s+종\s*목\s*[:：]?\s*([^\n]{1,60})/);
+  if (sameLine) {
+    return {
+      type: cleanIndustryValue(sameLine[1]),
+      item: cleanIndustryValue(sameLine[2]),
+    };
+  }
+
+  const typeOnly = extractIndustryValueByLabel(lines, /업\s*태/);
+  const itemOnly = extractIndustryValueByLabel(lines, /종\s*목/);
+  if (typeOnly || itemOnly) {
+    return {
+      type: cleanIndustryValue(typeOnly),
+      item: cleanIndustryValue(itemOnly),
+    };
+  }
+
+  const headerIndex = lines.findIndex((line) => /업\s*태/.test(line) && /종\s*목/.test(line));
+  if (headerIndex >= 0) {
+    const nextLine = lines[headerIndex + 1] || "";
+    const guessed = splitTaxIndustryLine(nextLine);
+    if (guessed.type || guessed.item) return guessed;
+  }
+
+  return { type: "", item: "" };
+}
+
+function getCleanLines(text) {
+  return text
+    .split(/\n+/)
+    .map((line) => line.replace(/\s{2,}/g, " ").trim())
+    .filter(Boolean);
+}
+
+function extractIndustryValueByLabel(lines, labelPattern) {
+  const index = lines.findIndex((line) => labelPattern.test(line));
+  if (index < 0) return "";
+
+  const sameLine = lines[index].replace(labelPattern, "").replace(/^[:：\s]+/, "").trim();
+  if (sameLine && !/업\s*태|종\s*목|사업장|대표자|개업|등록번호/.test(sameLine)) {
+    return sameLine;
+  }
+
+  const nextLine = lines[index + 1] || "";
+  if (nextLine && !/업\s*태|종\s*목|사업장|대표자|개업|등록번호/.test(nextLine)) {
+    return nextLine;
+  }
+
+  return "";
+}
+
+function splitTaxIndustryLine(line) {
+  const cleaned = cleanIndustryValue(line);
+  if (!cleaned) return { type: "", item: "" };
+
+  const typeKeywords = ["도매 및 소매업", "숙박 및 음식점업", "제조업", "서비스업", "건설업", "정보통신업", "부동산업", "교육 서비스업"];
+  const matchedType = typeKeywords.find((keyword) => cleaned.includes(keyword));
+  if (matchedType) {
+    return {
+      type: matchedType,
+      item: cleanIndustryValue(cleaned.replace(matchedType, "")),
+    };
+  }
+
+  return { type: "", item: cleaned };
+}
+
+function cleanIndustryValue(value) {
+  return cleanExtractedValue(value)
+    .replace(/업태|종목|주업태|주종목/g, "")
+    .replace(/사업장|소재지|대표자|성명|개업연월일.*$/g, "")
+    .trim();
 }
 
 function extractCorporateNumber(text) {
@@ -459,6 +565,7 @@ function cleanExtractedValue(value) {
 function syncBusinessConfirm(info) {
   confirmRegion.value = info.region || "";
   confirmIndustry.value = info.industry || "";
+  confirmOpenedAt.value = /^\d{4}-\d{2}-\d{2}$/.test(info.openedAt) ? info.openedAt : "";
   confirmStartup.checked = Boolean(info.businessAgeYears !== null && info.businessAgeYears <= 7);
   confirmYouth.checked = false;
   confirmFemale.checked = false;
