@@ -157,7 +157,7 @@ const confirmStartup = document.querySelector("#confirmStartup");
 fileInput.addEventListener("change", async () => {
   fileName.textContent = fileInput.files[0]
     ? `${fileInput.files[0].name} 선택됨`
-    : "이미지 파일을 올리면 정보를 읽어옵니다.";
+    : "이미지 또는 PDF 파일을 올리면 정보를 읽어옵니다.";
 
   if (state.userPath === "business" && fileInput.files[0]) {
     await readBusinessCertificate(fileInput.files[0]);
@@ -262,14 +262,14 @@ function setUserPath(path) {
 }
 
 async function readBusinessCertificate(file) {
-  if (!file.type.startsWith("image/")) {
-    setOcrStatus("error", "이미지 파일만 바로 읽을 수 있습니다. PDF OCR은 서버 연동 단계에서 추가하는 편이 안정적입니다.");
+  if (!window.Tesseract) {
+    setOcrStatus("error", "OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결 상태를 확인한 뒤 다시 시도해주세요.");
     renderUploadPrompt();
     return;
   }
 
-  if (!window.Tesseract) {
-    setOcrStatus("error", "OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결 상태를 확인한 뒤 다시 시도해주세요.");
+  if (!isImageFile(file) && !isPdfFile(file)) {
+    setOcrStatus("error", "JPG, PNG, PDF 파일만 읽을 수 있습니다.");
     renderUploadPrompt();
     return;
   }
@@ -281,15 +281,7 @@ async function readBusinessCertificate(file) {
   setOcrStatus("loading", "사업자등록증을 읽는 중입니다. 처음 실행할 때는 시간이 조금 걸릴 수 있습니다.");
 
   try {
-    const result = await Tesseract.recognize(file, "kor+eng", {
-      logger(progress) {
-        if (progress.status === "recognizing text") {
-          setOcrStatus("loading", `사업자등록증을 읽는 중입니다. ${Math.round(progress.progress * 100)}%`);
-        }
-      },
-    });
-
-    const text = normalizeOcrText(result.data.text);
+    const text = normalizeOcrText(await recognizeCertificateFile(file));
     state.extractedBusiness = parseBusinessCertificate(text);
     syncBusinessConfirm(state.extractedBusiness);
     renderExtractedInfo(state.extractedBusiness);
@@ -299,6 +291,79 @@ async function readBusinessCertificate(file) {
     setOcrStatus("error", "OCR 처리에 실패했습니다. 더 선명한 이미지로 다시 올려주세요.");
     renderUploadPrompt();
   }
+}
+
+async function recognizeCertificateFile(file) {
+  if (isPdfFile(file)) {
+    return recognizePdfFile(file);
+  }
+
+  return recognizeImageLike(file, "사업자등록증을 읽는 중입니다.");
+}
+
+function isImageFile(file) {
+  return file.type.startsWith("image/");
+}
+
+function isPdfFile(file) {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+async function recognizeImageLike(imageSource, messagePrefix) {
+  const result = await Tesseract.recognize(imageSource, "kor+eng", {
+    logger(progress) {
+      if (progress.status === "recognizing text") {
+        setOcrStatus("loading", `${messagePrefix} ${Math.round(progress.progress * 100)}%`);
+      }
+    },
+  });
+  return result.data.text;
+}
+
+async function recognizePdfFile(file) {
+  const pdfjsLib = await loadPdfJs();
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pageCount = Math.min(pdf.numPages, 2);
+  const pageTexts = [];
+
+  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+    setOcrStatus("loading", `PDF ${pageNumber}/${pageCount}페이지를 이미지로 변환하는 중입니다.`);
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 2.2 });
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) continue;
+    const pageText = await recognizeImageLike(blob, `PDF ${pageNumber}/${pageCount}페이지 OCR 중입니다.`);
+    pageTexts.push(pageText);
+  }
+
+  if (pdf.numPages > pageCount) {
+    setOcrStatus("loading", `앞 ${pageCount}페이지만 읽었습니다. 사업자등록증은 보통 첫 페이지에 있습니다.`);
+  }
+
+  return pageTexts.join("\n");
+}
+
+async function loadPdfJs() {
+  if (window.pdfjsLib) {
+    configurePdfWorker(window.pdfjsLib);
+    return window.pdfjsLib;
+  }
+
+  const module = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
+  configurePdfWorker(module);
+  return module;
+}
+
+function configurePdfWorker(pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
 }
 
 function normalizeOcrText(text) {
@@ -636,7 +701,7 @@ function renderUploadPrompt() {
   prompt.className = "empty-state";
   prompt.innerHTML = `
     <strong>기존 사업자는 사업자등록증 업로드만 받습니다.</strong>
-    <span>이미지 파일을 올리면 상호, 사업자번호, 업종, 지역, 개업일을 읽고 맞춤 지원사업을 추천합니다.</span>
+    <span>이미지 또는 PDF 파일을 올리면 상호, 사업자번호, 업종, 지역, 개업일을 읽고 맞춤 지원사업을 추천합니다.</span>
   `;
   resultList.appendChild(prompt);
 }

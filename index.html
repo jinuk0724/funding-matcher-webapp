@@ -116,12 +116,12 @@
                 <span class="upload-icon">+</span>
                 <span>
                   <strong>사업자등록증 선택</strong>
-                  <small id="fileName">이미지 파일을 올리면 정보를 읽어옵니다.</small>
+                  <small id="fileName">이미지 또는 PDF 파일을 올리면 정보를 읽어옵니다.</small>
                 </span>
               </label>
-              <input id="certificate" type="file" accept="image/*" />
+              <input id="certificate" type="file" accept="image/*,.pdf,application/pdf" />
               <div id="ocrStatus" class="ocr-note">
-                JPG, PNG 같은 이미지 형식의 사업자등록증을 올려주세요.
+                JPG, PNG, PDF 형식의 사업자등록증을 올려주세요.
               </div>
               <dl id="extractedInfo" class="extracted-info" hidden></dl>
               <div id="businessConfirm" class="business-confirm" hidden>
@@ -239,6 +239,7 @@
       </article>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs" type="module"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="./app.js"></script>
   </body>
