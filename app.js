@@ -363,6 +363,9 @@ function extractValue(text, patterns) {
 function extractDateAfter(text) {
   const compact = text.replace(/\s+/g, " ");
   const compactNoSpace = text.replace(/\s+/g, "");
+  const tableDate = extractOpeningDateFromMixedDateTable(compact);
+  if (tableDate) return tableDate;
+
   const labeled = compact.match(/개\s*업\s*(?:연|년)?\s*월\s*일.{0,50}?((?:19|20)?[0-9]{2}[.\-/년\s]+[01]?[0-9][.\-/월\s]+[0-3]?[0-9]|[0-9]{8})/);
   if (labeled?.[1]) return normalizeDate(labeled[1]);
 
@@ -378,6 +381,24 @@ function extractDateAfter(text) {
   }
 
   return "";
+}
+
+function extractOpeningDateFromMixedDateTable(text) {
+  const birthLabelIndex = text.search(/생\s*년\s*월\s*일/);
+  const openingLabelIndex = text.search(/개\s*업\s*(?:연|년)?\s*월\s*일/);
+  if (openingLabelIndex < 0) return "";
+
+  const windowStart = Math.max(0, Math.min(
+    birthLabelIndex >= 0 ? birthLabelIndex : openingLabelIndex,
+    openingLabelIndex,
+  ));
+  const windowText = text.slice(windowStart, openingLabelIndex + 140);
+  const dateMatches = [...windowText.matchAll(/((?:19|20)?[0-9]{2}[.\-/년\s]+[01]?[0-9][.\-/월\s]+[0-3]?[0-9]|[0-9]{8})/g)];
+  if (dateMatches.length === 0) return "";
+
+  const birthBeforeOpening = birthLabelIndex >= 0 && birthLabelIndex < openingLabelIndex;
+  const candidate = birthBeforeOpening && dateMatches.length > 1 ? dateMatches[1][1] : dateMatches[0][1];
+  return normalizeDate(candidate);
 }
 
 function normalizeDate(value) {
@@ -550,6 +571,7 @@ function inferIndustry(text) {
   if (/제조|가공|공장|생산/.test(value)) return "제조업";
   if (/소프트웨어|정보통신|개발|플랫폼|앱|웹/.test(value)) return "IT/소프트웨어";
   if (/콘텐츠|영상|디자인|출판|미디어/.test(value)) return "콘텐츠";
+  if (/한의원|의원|병원|치과|한방|의료|보건|약국|치료|진료/.test(value)) return "서비스업";
   if (/서비스|컨설팅|교육|관리/.test(value)) return "서비스업";
   return null;
 }
