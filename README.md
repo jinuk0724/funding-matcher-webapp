@@ -50,6 +50,8 @@ Play Store 배포가 필요하면 다음 순서가 좋습니다.
 
 ## 다음 단계
 
+- [ROADMAP.md](./ROADMAP.md)에 단계별 업그레이드 계획 정리
+- [data-sources.md](./data-sources.md)에 지원사업 데이터 소스 후보 정리
 - 기업마당 API 수집 모듈 추가
 - 사용자 계정 및 사업자 프로필 저장
 - 실제 신청 마감 알림
