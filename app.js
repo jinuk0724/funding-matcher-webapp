@@ -154,6 +154,8 @@ const state = {
   sortMode: "score",
   userPath: "founder",
   extractedBusiness: null,
+  programs: null,
+  programsSource: "샘플",
 };
 
 const form = document.querySelector("#businessForm");
@@ -208,7 +210,7 @@ sortMode.addEventListener("change", () => {
   renderMatches();
 });
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (state.userPath === "business" && !fileInput.files[0]) {
@@ -217,9 +219,62 @@ form.addEventListener("submit", (event) => {
   }
 
   const profile = getProfile();
-  state.matches = supportPrograms.map((program) => matchProgram(profile, program));
+  const programs = await getSupportPrograms();
+  state.matches = programs.map((program) => matchProgram(profile, program));
   renderMatches(profile.companyName);
 });
+
+async function getSupportPrograms() {
+  if (state.programs) return state.programs;
+
+  try {
+    const response = await fetch("./api/bizinfo?searchCnt=100&pageUnit=50&pageIndex=1", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`API ${response.status}`);
+    const data = await response.json();
+    if (!Array.isArray(data.programs) || data.programs.length === 0) {
+      throw new Error("No programs from Bizinfo API.");
+    }
+    state.programs = data.programs.map(normalizeProgramFromApi);
+    state.programsSource = `기업마당 · ${data.fetchedAt ? data.fetchedAt.slice(0, 10) : "실시간"}`;
+    return state.programs;
+  } catch (error) {
+    state.programs = supportPrograms;
+    state.programsSource = "샘플 데이터";
+    return state.programs;
+  }
+}
+
+function normalizeProgramFromApi(program) {
+  return {
+    id: program.id,
+    source: program.source || "기업마당",
+    title: program.title || "지원사업 공고",
+    agency: program.agency || "기업마당",
+    type: program.type || "보조금",
+    regions: Array.isArray(program.regions) && program.regions.length ? program.regions : ["전국"],
+    industries: Array.isArray(program.industries) && program.industries.length ? program.industries : ["서비스업"],
+    businessTypes:
+      Array.isArray(program.businessTypes) && program.businessTypes.length
+        ? program.businessTypes
+        : ["개인사업자", "법인사업자", "예비창업자"],
+    maxRevenue: program.maxRevenue ?? null,
+    maxEmployees: program.maxEmployees ?? null,
+    maxBusinessAgeYears: program.maxBusinessAgeYears ?? null,
+    maxOwnerAge: program.maxOwnerAge ?? null,
+    needsStartup: Boolean(program.needsStartup),
+    needsExports: Boolean(program.needsExports),
+    needsFemaleOwned: Boolean(program.needsFemaleOwned),
+    amount: program.amount ?? null,
+    deadline: program.deadline || "",
+    url: program.url || "https://www.bizinfo.go.kr/",
+    description: program.description || "지원사업 공고입니다. 상세 조건은 원문 공고를 확인하세요.",
+    required: Array.isArray(program.required) && program.required.length ? program.required : ["공고문 확인"],
+    eligibilityText: program.eligibilityText || "",
+    collectedAt: program.collectedAt || "",
+  };
+}
 
 function getProfile() {
   const data = new FormData(form);
@@ -895,7 +950,7 @@ function renderMatches(companyName = getProfile().companyName) {
   }
 
   const available = sorted.filter((program) => program.status === "eligible" && program.score >= 70);
-  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건`;
+  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · ${state.programsSource}`;
   document.querySelector("#topScore").textContent = `${available[0]?.score || 0}%`;
   document.querySelector("#urgentCount").textContent = String(
     sorted.filter((program) => program.daysLeft >= 0 && program.daysLeft <= 14).length,
@@ -923,7 +978,7 @@ function createProgramCard(program) {
   deadline.textContent = program.daysLeft < 0 ? "마감" : `D-${program.daysLeft}`;
   deadline.classList.toggle("expired", program.daysLeft < 0);
   fragment.querySelector("h3").textContent = program.title;
-  fragment.querySelector(".agency").textContent = `${program.agency} · ${program.type}`;
+  fragment.querySelector(".agency").textContent = `${program.agency} · ${program.type}${program.source ? ` · ${program.source}` : ""}`;
   fragment.querySelector(".description").textContent = program.description;
   fragment.querySelector(".score-bar span").style.width = `${program.score}%`;
   fragment.querySelector(".score-label").textContent = `${program.score}%`;
@@ -931,7 +986,7 @@ function createProgramCard(program) {
 
   const meta = fragment.querySelector(".program-meta");
   [
-    ["지원규모", `${program.amount.toLocaleString("ko-KR")}만원`],
+    ["지원규모", program.amount ? `${program.amount.toLocaleString("ko-KR")}만원` : "공고문 확인"],
     ["대상지역", program.regions.join(", ")],
     ["대상업종", program.industries.slice(0, 3).join(", ")],
     ["필요서류", program.required.slice(0, 2).join(", ")],

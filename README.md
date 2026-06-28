@@ -37,6 +37,17 @@
 2. Build command는 비워둡니다.
 3. Publish directory는 프로젝트 루트로 설정합니다.
 
+### 기업마당 API 연동
+
+GitHub Pages는 API 인증키를 숨길 수 없으므로 기업마당 API는 Netlify 배포를 권장합니다.
+
+Netlify에서 환경변수를 추가합니다.
+
+- Key: `BIZINFO_API_KEY`
+- Value: 기업마당에서 발급받은 인증키
+
+앱은 `/api/bizinfo`를 통해 Netlify Function을 호출합니다. 환경변수가 없거나 API 호출에 실패하면 기존 샘플 데이터로 동작합니다.
+
 ## Android 앱으로 만들기
 
 가장 빠른 방식은 PWA를 Android에서 설치하는 것입니다. Chrome으로 HTTPS 배포 주소에 접속하면 홈 화면에 설치할 수 있습니다.
@@ -52,7 +63,7 @@ Play Store 배포가 필요하면 다음 순서가 좋습니다.
 
 - [ROADMAP.md](./ROADMAP.md)에 단계별 업그레이드 계획 정리
 - [data-sources.md](./data-sources.md)에 지원사업 데이터 소스 후보 정리
-- 기업마당 API 수집 모듈 추가
+- 기업마당 API 수집 모듈 확장
 - 사용자 계정 및 사업자 프로필 저장
 - 실제 신청 마감 알림
 - 공고문 AI 요약과 자격요건 추출
