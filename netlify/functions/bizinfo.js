@@ -154,6 +154,7 @@ function normalizeBizinfoPrograms(payload) {
 function findItems(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
+  if (Array.isArray(value.jsonArray)) return value.jsonArray;
   if (Array.isArray(value.items)) return value.items;
   if (Array.isArray(value.item)) return value.item;
   if (value.response?.body?.items?.item) {
