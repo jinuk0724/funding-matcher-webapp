@@ -826,7 +826,7 @@ function renderNoEligiblePrograms() {
   prompt.className = "empty-state";
   prompt.innerHTML = `
     <strong>현재 조건에 맞는 지원사업이 없습니다.</strong>
-    <span>대상 조건이 맞지 않는 사업은 숨겼습니다. 지역, 업종, 청년/여성기업/수출기업 여부를 다시 확인해보세요.</span>
+    <span>조건을 넓혀 볼 수 있도록 확인 필요 공고를 함께 표시했습니다. 지역, 업종, 창업 여부를 다시 확인해보세요.</span>
   `;
   resultList.appendChild(prompt);
 }
@@ -934,7 +934,7 @@ function makeBooleanCheck(key, label, value, requiredValue, weight) {
 }
 
 function renderMatches(companyName = getProfile().companyName) {
-  const visibleMatches = state.matches.filter((program) => program.status !== "not_eligible");
+  const visibleMatches = getVisibleMatches();
   const sorted = [...visibleMatches].sort((a, b) => {
     if (state.sortMode === "deadline") return a.daysLeft - b.daysLeft;
     if (state.sortMode === "amount") return b.amount - a.amount;
@@ -950,7 +950,8 @@ function renderMatches(companyName = getProfile().companyName) {
   }
 
   const available = sorted.filter((program) => program.status === "eligible" && program.score >= 70);
-  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · ${state.programsSource}`;
+  const reviewCount = sorted.filter((program) => program.status === "needs_review").length;
+  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · 확인 필요 ${reviewCount}건 · ${state.programsSource}`;
   document.querySelector("#topScore").textContent = `${available[0]?.score || 0}%`;
   document.querySelector("#urgentCount").textContent = String(
     sorted.filter((program) => program.daysLeft >= 0 && program.daysLeft <= 14).length,
@@ -958,6 +959,24 @@ function renderMatches(companyName = getProfile().companyName) {
   document.querySelector("#loanCount").textContent = String(
     available.filter((program) => program.type === "정책자금").length,
   );
+}
+
+function getVisibleMatches() {
+  const eligibleOrReview = state.matches.filter((program) => program.status !== "not_eligible");
+  if (eligibleOrReview.length > 0) return eligibleOrReview;
+
+  return [...state.matches]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map((program) => ({
+      ...program,
+      status: "needs_review",
+      review: [
+        "현재 입력 조건과 정확히 맞지는 않지만 확인해볼 만한 공고입니다",
+        ...program.missing.slice(0, 2),
+      ],
+      missing: [],
+    }));
 }
 
 function statusRank(status) {
@@ -975,7 +994,7 @@ function createProgramCard(program) {
   card.classList.toggle("not-eligible", program.status === "not_eligible");
   card.classList.toggle("needs-review", program.status === "needs_review");
   fragment.querySelector(".tag").textContent = statusLabel(program);
-  deadline.textContent = program.daysLeft < 0 ? "마감" : `D-${program.daysLeft}`;
+  deadline.textContent = formatDeadlineBadge(program);
   deadline.classList.toggle("expired", program.daysLeft < 0);
   fragment.querySelector("h3").textContent = program.title;
   fragment.querySelector(".agency").textContent = `${program.agency} · ${program.type}${program.source ? ` · ${program.source}` : ""}`;
@@ -1010,6 +1029,12 @@ function createProgramCard(program) {
   return fragment;
 }
 
+function formatDeadlineBadge(program) {
+  if (!program.deadline) return "상시/공고문 확인";
+  if (program.daysLeft < 0) return "마감";
+  return `D-${program.daysLeft}`;
+}
+
 function statusLabel(program) {
   if (program.status === "eligible") return "추천 가능";
   if (program.status === "needs_review") return "확인 필요";
@@ -1027,8 +1052,10 @@ function makeReasonText(program) {
 }
 
 function getDaysLeft(deadline) {
+  if (!deadline) return 9999;
   const today = new Date("2026-05-27T00:00:00+09:00");
   const end = new Date(`${deadline}T23:59:59+09:00`);
+  if (Number.isNaN(end.getTime())) return 9999;
   return Math.ceil((end.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
 }
 

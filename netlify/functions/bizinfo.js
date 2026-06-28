@@ -143,7 +143,7 @@ function normalizeBizinfoPrograms(payload) {
       amount: null,
       deadline: normalizeDeadline(deadlineText),
       url,
-      description,
+      description: cleanHtmlText(description),
       required: ["공고문 확인"],
       eligibilityText: pick(item, ["지원대상", "trgetNm", "target"]) || "",
       collectedAt: new Date().toISOString().slice(0, 10),
@@ -196,6 +196,9 @@ function inferIndustries(text) {
 
 function inferBusinessTypes(text) {
   if (/예비창업|예비 창업/.test(text)) return ["예비창업자"];
+  if (/중소기업|소상공인|중견기업|법인|개인기업|사업자등록|기업/.test(text)) {
+    return ["개인사업자", "법인사업자"];
+  }
   return ["개인사업자", "법인사업자", "예비창업자"];
 }
 
@@ -210,10 +213,25 @@ function inferSupportType(text) {
 }
 
 function normalizeDeadline(value) {
+  if (/예산\s*소진|상시|수시/.test(String(value))) return "";
   const digits = String(value).match(/20[0-9]{2}[^0-9]?[01]?[0-9][^0-9]?[0-3]?[0-9]/g);
   if (!digits || digits.length === 0) return "";
   const last = digits[digits.length - 1].replace(/\D/g, "");
   return `${last.slice(0, 4)}-${last.slice(4, 6)}-${last.slice(6, 8)}`;
+}
+
+function cleanHtmlText(value) {
+  return String(value)
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 360);
 }
 
 function hash(value) {
