@@ -156,12 +156,14 @@ const state = {
   extractedBusiness: null,
   programs: null,
   programsSource: "샘플",
+  typeFilter: "all",
 };
 
 const form = document.querySelector("#businessForm");
 const resultList = document.querySelector("#resultList");
 const summaryTitle = document.querySelector("#summaryTitle");
 const sortMode = document.querySelector("#sortMode");
+const filterChips = document.querySelectorAll(".filter-chip");
 const fileInput = document.querySelector("#certificate");
 const fileName = document.querySelector("#fileName");
 const pathButtons = document.querySelectorAll(".path-card");
@@ -208,6 +210,14 @@ pathButtons.forEach((button) => {
 sortMode.addEventListener("change", () => {
   state.sortMode = sortMode.value;
   renderMatches();
+});
+
+filterChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    state.typeFilter = chip.dataset.type;
+    filterChips.forEach((item) => item.classList.toggle("active", item === chip));
+    renderMatches();
+  });
 });
 
 form.addEventListener("submit", async (event) => {
@@ -951,7 +961,8 @@ function renderMatches(companyName = getProfile().companyName) {
 
   const available = sorted.filter((program) => program.status === "eligible" && program.score >= 70);
   const reviewCount = sorted.filter((program) => program.status === "needs_review").length;
-  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · 확인 필요 ${reviewCount}건 · ${state.programsSource}`;
+  const filterLabel = state.typeFilter === "all" ? "전체유형" : state.typeFilter;
+  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · 확인 필요 ${reviewCount}건 · ${filterLabel} · ${state.programsSource}`;
   document.querySelector("#topScore").textContent = `${available[0]?.score || 0}%`;
   document.querySelector("#urgentCount").textContent = String(
     sorted.filter((program) => program.daysLeft >= 0 && program.daysLeft <= 14).length,
@@ -962,10 +973,13 @@ function renderMatches(companyName = getProfile().companyName) {
 }
 
 function getVisibleMatches() {
-  const eligibleOrReview = state.matches.filter((program) => program.status !== "not_eligible");
+  const filtered = state.matches.filter(
+    (program) => state.typeFilter === "all" || program.type === state.typeFilter,
+  );
+  const eligibleOrReview = filtered.filter((program) => program.status !== "not_eligible");
   if (eligibleOrReview.length > 0) return eligibleOrReview;
 
-  return [...state.matches]
+  return [...filtered]
     .sort((a, b) => b.score - a.score)
     .slice(0, 8)
     .map((program) => ({
