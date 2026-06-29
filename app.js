@@ -334,6 +334,7 @@ function getProfile() {
 
     return {
       companyName: extracted.companyName || "업로드 사업자",
+      businessNumber: extracted.businessNumber || null,
       businessType: extracted.businessType || "개인사업자",
       region: confirmRegion.value || null,
       industry: confirmIndustry.value || null,
@@ -910,6 +911,7 @@ function matchProgram(profile, program) {
   const checks = [
     makeCheck("region", "지역", profile.region, program.regions, 24, true),
     makeIndustryCheck(profile, program),
+    makeBusinessRelevanceCheck(profile, program),
     makeCheck("businessType", "사업자 유형", profile.businessType, program.businessTypes, 10, true),
     makeMaxCheck("revenue", "연 매출", profile.revenue, program.maxRevenue, 12, false, formatRevenue),
     makeMaxCheck("employees", "상시근로자", profile.employees, program.maxEmployees, 10, false, (v) => `${v}명`),
@@ -1022,6 +1024,57 @@ function getStrictIndustryMiss(profile, program) {
   return "";
 }
 
+function makeBusinessRelevanceCheck(profile, program) {
+  if (profile.source !== "business") return null;
+
+  if (!profile.businessNumber || profile.businessNumber === "인식 필요") {
+    return {
+      key: "businessNumber",
+      label: "사업자번호",
+      weight: 20,
+      required: true,
+      status: "unknown",
+      unknownLabel: "사업자번호 인식 확인 필요",
+    };
+  }
+
+  const text = `${program.title || ""} ${program.description || ""} ${program.eligibilityText || ""}`;
+  const allowed = program.industries || [];
+  const hasExactIndustry = profile.industry && allowed.includes(profile.industry);
+  const isGeneralBusinessProgram =
+    allowed.includes("전업종") &&
+    /중소기업|소상공인|사업자등록|개인사업자|법인사업자|기업/.test(text) &&
+    !hasOtherSectorTarget(text, profile.industry);
+  const hasHealthcareText =
+    profile.industry === "보건/의료업" &&
+    /의료|보건|한의|병원|의원|약국|요양기관|의료기관/.test(text);
+
+  const pass = Boolean(hasExactIndustry || isGeneralBusinessProgram || hasHealthcareText);
+
+  return {
+    key: "businessRelevance",
+    label: "사업자 관련성",
+    weight: 30,
+    required: true,
+    status: pass ? "pass" : "fail",
+    passLabel: "사업자 업종과 공고 대상 문구 일치",
+    failLabel: "사업자 업종과 직접 관련된 공고가 아님",
+  };
+}
+
+function hasOtherSectorTarget(text, profileIndustry) {
+  const sectorPatterns = [
+    ["콘텐츠", /예술|공연|문화예술|콘텐츠|영상|게임|출판|미디어|캐릭터|웹툰/],
+    ["제조업", /제조|공장|생산|스마트공장|소공인|뿌리기업|부품|시제품/],
+    ["IT/소프트웨어", /소프트웨어|SW|ICT|정보통신|AI|플랫폼|데이터|앱|웹/],
+    ["음식점업", /음식|식당|카페|외식|숙박/],
+    ["도소매업", /도소매|소매|도매|판매|유통|온라인몰|전자상거래/],
+    ["보건/의료업", /의료|보건|한의|병원|의원|약국|요양기관|의료기관/],
+  ];
+
+  return sectorPatterns.some(([industry, pattern]) => industry !== profileIndustry && pattern.test(text));
+}
+
 function makeMaxCheck(key, label, value, maxValue, weight, required, format) {
   if (!maxValue) return null;
   if (value === null || Number.isNaN(value)) {
@@ -1094,8 +1147,7 @@ function getVisibleMatches() {
   const filtered = state.matches.filter(
     (program) => state.typeFilter === "all" || program.type === state.typeFilter,
   );
-  const eligibleOrReview = filtered.filter((program) => program.status !== "not_eligible");
-  return eligibleOrReview;
+  return filtered.filter((program) => program.status === "eligible" && program.score >= 75);
 }
 
 function statusRank(status) {
