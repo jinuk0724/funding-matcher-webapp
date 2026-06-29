@@ -248,11 +248,7 @@ async function getSupportPrograms() {
   if (state.programs) return state.programs;
 
   try {
-    const response = await fetch("./api/programs?sources=all&searchCnt=100&pageUnit=50&pageIndex=1", {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) throw new Error(`API ${response.status}`);
-    const data = await response.json();
+    const data = await fetchProgramsWithFallback();
     if (!Array.isArray(data.programs) || data.programs.length === 0) {
       throw new Error("No programs from Bizinfo API.");
     }
@@ -271,6 +267,30 @@ async function getSupportPrograms() {
     state.fetchedAt = "";
     return state.programs;
   }
+}
+
+async function fetchProgramsWithFallback() {
+  const query = "sources=all&searchCnt=100&pageUnit=50&pageIndex=1";
+  const endpoints = [
+    `./api/programs?${query}`,
+    `https://papaya-donut-3571fa.netlify.app/api/programs?${query}`,
+  ];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("지원사업 API를 불러오지 못했습니다.");
 }
 
 function normalizeProgramFromApi(program) {
