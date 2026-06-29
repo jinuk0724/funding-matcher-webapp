@@ -157,13 +157,15 @@ async function fetchKstartupPrograms() {
 }
 
 function parseKstartupRss(xml) {
-  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 120);
+  const currentYear = new Date().getFullYear();
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
   return items.map((match, index) => {
     const itemXml = match[1];
     const title = decodeHtml(tag(itemXml, "title")) || "K-Startup 공고";
     const url = decodeHtml(tag(itemXml, "link")) || "https://www.k-startup.go.kr/";
     const author = decodeHtml(tag(itemXml, "author")) || "K-Startup";
     const pubDate = tag(itemXml, "pubDate");
+    const collectedAt = normalizePubDate(pubDate) || new Date().toISOString().slice(0, 10);
     const text = `${title} ${author}`;
 
     return {
@@ -181,9 +183,14 @@ function parseKstartupRss(xml) {
       description: `${title} 공고입니다. K-Startup 원문에서 세부 신청대상과 제출서류를 확인하세요.`,
       required: ["공고문 확인"],
       eligibilityText: inferEligibilityText(text),
-      collectedAt: normalizePubDate(pubDate) || new Date().toISOString().slice(0, 10),
+      collectedAt,
+      dataDepth: "title_only",
     };
-  });
+  })
+    .filter((program) => Number(program.collectedAt.slice(0, 4)) >= currentYear)
+    .filter((program) => !/통합공고 요약본|챗봇 제공|지원사업 준비를 AI와 함께/.test(program.title))
+    .sort((a, b) => b.collectedAt.localeCompare(a.collectedAt))
+    .slice(0, 120);
 }
 
 function tag(xml, name) {
@@ -216,7 +223,7 @@ function inferIndustries(text) {
   if (/제조|공장|생산|메이커|시제품|소공인|부품/.test(text)) result.push("제조업");
   if (/SW|소프트웨어|정보통신|ICT|AI|플랫폼|앱|데이터|디바이스|딥테크/.test(text)) result.push("IT/소프트웨어");
   if (/콘텐츠|미디어|디자인|영상|게임|출판|예술|공연|크리에이터/.test(text)) result.push("콘텐츠");
-  if (/의료|보건|바이오|한의원|병원|의원|메드텍|헬스/.test(text)) result.push("보건/의료업");
+  if (/의료|보건|바이오|Bio|bio|한의원|병원|의원|메드텍|MedTech|헬스/.test(text)) result.push("보건/의료업");
   return result.length ? [...new Set(result)] : ["전업종"];
 }
 

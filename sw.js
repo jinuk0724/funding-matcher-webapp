@@ -1,4 +1,4 @@
-const CACHE_NAME = "funding-matcher-v15";
+const CACHE_NAME = "funding-matcher-v16";
 const APP_ASSETS = [
   "./",
   "./index.html",

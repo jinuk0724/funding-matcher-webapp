@@ -286,6 +286,7 @@ function normalizeProgramFromApi(program) {
     required: Array.isArray(program.required) && program.required.length ? program.required : ["공고문 확인"],
     eligibilityText: program.eligibilityText || "",
     collectedAt: program.collectedAt || "",
+    dataDepth: program.dataDepth || "summary",
   };
 }
 
@@ -1041,8 +1042,10 @@ function makeBusinessRelevanceCheck(profile, program) {
   const text = `${program.title || ""} ${program.description || ""} ${program.eligibilityText || ""}`;
   const allowed = program.industries || [];
   const hasExactIndustry = profile.industry && allowed.includes(profile.industry);
+  const isTitleOnlySource = program.dataDepth === "title_only" || program.source === "K-Startup";
   const isGeneralBusinessProgram =
     allowed.includes("전업종") &&
+    !isTitleOnlySource &&
     /중소기업|소상공인|사업자등록|개인사업자|법인사업자|기업/.test(text) &&
     !hasOtherSectorTarget(text, profile.industry);
   const hasHealthcareText =
