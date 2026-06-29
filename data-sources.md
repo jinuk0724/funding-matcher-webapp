@@ -20,6 +20,7 @@
 ## 현재 구현 상태
 
 - `기업마당`: 실제 API 연동 완료
+- `K-Startup`: 모집중 RSS 연동 완료
 - `/api/programs`: 여러 데이터 소스를 합치기 위한 통합 API 추가
 - 나머지 출처: API 키/공식 엔드포인트 확인 후 같은 어댑터 구조에 추가 예정
 
@@ -28,7 +29,7 @@
 | 출처 | 환경변수 |
 |---|---|
 | 기업마당 | `BIZINFO_API_KEY` |
-| K-Startup | `KSTARTUP_API_KEY` |
+| K-Startup | 키 없이 RSS 우선 연동 |
 | 소상공인24 | `SEMAS_API_KEY` |
 | 중소벤처기업진흥공단 | `KOSMES_API_KEY` |
 | SMTECH | `SMTECH_API_KEY` |
