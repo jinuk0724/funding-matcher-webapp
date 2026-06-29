@@ -156,14 +156,19 @@ const state = {
   extractedBusiness: null,
   programs: null,
   programsSource: "샘플",
+  connectedSources: [],
+  fetchedAt: "",
   typeFilter: "all",
+  regionFilter: "all",
 };
 
 const form = document.querySelector("#businessForm");
 const resultList = document.querySelector("#resultList");
 const summaryTitle = document.querySelector("#summaryTitle");
+const sourceSummary = document.querySelector("#sourceSummary");
 const sortMode = document.querySelector("#sortMode");
 const filterChips = document.querySelectorAll(".filter-chip");
+const regionFilter = document.querySelector("#regionFilter");
 const fileInput = document.querySelector("#certificate");
 const fileName = document.querySelector("#fileName");
 const pathButtons = document.querySelectorAll(".path-card");
@@ -212,6 +217,11 @@ sortMode.addEventListener("change", () => {
   renderMatches();
 });
 
+regionFilter.addEventListener("change", () => {
+  state.regionFilter = regionFilter.value;
+  renderMatches();
+});
+
 filterChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     state.typeFilter = chip.dataset.type;
@@ -250,11 +260,15 @@ async function getSupportPrograms() {
     const connectedSources = Array.isArray(data.sources)
       ? data.sources.filter((source) => source.status === "connected").map((source) => source.name)
       : ["기업마당"];
-    state.programsSource = `${connectedSources.join("+")} · ${data.fetchedAt ? data.fetchedAt.slice(0, 10) : "실시간"}`;
+    state.connectedSources = connectedSources;
+    state.fetchedAt = data.fetchedAt ? data.fetchedAt.slice(0, 10) : "실시간";
+    state.programsSource = `${connectedSources.join("+")} · ${state.fetchedAt}`;
     return state.programs;
   } catch (error) {
     state.programs = supportPrograms;
     state.programsSource = "샘플 데이터";
+    state.connectedSources = ["샘플 데이터"];
+    state.fetchedAt = "";
     return state.programs;
   }
 }
@@ -886,6 +900,7 @@ function renderUploadPrompt() {
   state.matches = [];
   resultList.replaceChildren();
   summaryTitle.textContent = "사업자등록증을 올리면 추천을 시작합니다";
+  sourceSummary.replaceChildren();
   document.querySelector("#topScore").textContent = "0%";
   document.querySelector("#urgentCount").textContent = "0";
   document.querySelector("#loanCount").textContent = "0";
@@ -1120,6 +1135,10 @@ function makeBooleanCheck(key, label, value, requiredValue, weight) {
 }
 
 function renderMatches(companyName = getProfile().companyName) {
+  syncRegionFilterOptions();
+  renderFilterCounts();
+  renderSourceSummary();
+
   const visibleMatches = getVisibleMatches();
   const sorted = [...visibleMatches].sort((a, b) => {
     if (state.sortMode === "deadline") return a.daysLeft - b.daysLeft;
@@ -1138,7 +1157,9 @@ function renderMatches(companyName = getProfile().companyName) {
   const available = sorted.filter((program) => program.status === "eligible" && program.score >= 70);
   const reviewCount = sorted.filter((program) => program.status === "needs_review").length;
   const filterLabel = state.typeFilter === "all" ? "전체유형" : state.typeFilter;
-  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · 확인 필요 ${reviewCount}건 · ${filterLabel} · ${state.programsSource}`;
+  const regionLabel = state.regionFilter === "all" ? "전체지역" : state.regionFilter;
+  summaryTitle.textContent = `${companyName}에 맞는 지원사업 ${available.length}건 · 확인 필요 ${reviewCount}건`;
+  summaryTitle.dataset.context = `${filterLabel} · ${regionLabel}`;
   document.querySelector("#topScore").textContent = `${available[0]?.score || 0}%`;
   document.querySelector("#urgentCount").textContent = String(
     sorted.filter((program) => program.daysLeft >= 0 && program.daysLeft <= 14).length,
@@ -1152,7 +1173,65 @@ function getVisibleMatches() {
   const filtered = state.matches.filter(
     (program) => state.typeFilter === "all" || program.type === state.typeFilter,
   );
-  return filtered.filter((program) => program.status === "eligible" && program.score >= 75);
+  return filtered.filter((program) => {
+    const matchesRegion =
+      state.regionFilter === "all" ||
+      (program.regions || []).includes("전국") ||
+      (program.regions || []).includes(state.regionFilter);
+    return matchesRegion && program.status === "eligible" && program.score >= 75;
+  });
+}
+
+function syncRegionFilterOptions() {
+  const currentValue = state.regionFilter;
+  const profileRegion = getProfile().region;
+  const regions = ["all", ...new Set([profileRegion, ...REGIONS].filter(Boolean))];
+  const existing = [...regionFilter.options].map((option) => option.value);
+  if (regions.join("|") === existing.join("|")) return;
+
+  regionFilter.replaceChildren();
+  regions.forEach((region) => {
+    const option = document.createElement("option");
+    option.value = region;
+    option.textContent = region === "all" ? "전체 지역" : region;
+    regionFilter.appendChild(option);
+  });
+  regionFilter.value = regions.includes(currentValue) ? currentValue : "all";
+  state.regionFilter = regionFilter.value;
+}
+
+function renderFilterCounts() {
+  filterChips.forEach((chip) => {
+    const type = chip.dataset.type;
+    const count = state.matches.filter((program) => {
+      const matchesType = type === "all" || program.type === type;
+      const matchesRegion =
+        state.regionFilter === "all" ||
+        (program.regions || []).includes("전국") ||
+        (program.regions || []).includes(state.regionFilter);
+      return matchesType && matchesRegion && program.status === "eligible" && program.score >= 75;
+    }).length;
+    chip.dataset.count = String(count);
+    chip.textContent = `${chip.dataset.label || chip.textContent.replace(/\s+\d+$/, "")} ${count}`;
+    chip.dataset.label = chip.dataset.label || chip.textContent.replace(/\s+\d+$/, "");
+  });
+}
+
+function renderSourceSummary() {
+  sourceSummary.replaceChildren();
+  const sources = state.connectedSources.length ? state.connectedSources : [state.programsSource];
+  sources.forEach((source) => {
+    const item = document.createElement("span");
+    item.className = `source-pill source-${sourceSlug(source)}`;
+    item.textContent = source;
+    sourceSummary.appendChild(item);
+  });
+  if (state.fetchedAt) {
+    const date = document.createElement("span");
+    date.className = "source-date";
+    date.textContent = state.fetchedAt;
+    sourceSummary.appendChild(date);
+  }
 }
 
 function statusRank(status) {
@@ -1167,13 +1246,14 @@ function createProgramCard(program) {
   const card = fragment.querySelector(".program-card");
   const deadline = fragment.querySelector(".deadline");
 
+  card.classList.add(`source-card-${sourceSlug(program.source)}`);
   card.classList.toggle("not-eligible", program.status === "not_eligible");
   card.classList.toggle("needs-review", program.status === "needs_review");
   fragment.querySelector(".tag").textContent = statusLabel(program);
   deadline.textContent = formatDeadlineBadge(program);
   deadline.classList.toggle("expired", program.daysLeft < 0);
   fragment.querySelector("h3").textContent = program.title;
-  fragment.querySelector(".agency").textContent = `${program.agency} · ${program.type}${program.source ? ` · ${program.source}` : ""}`;
+  renderProgramIdentity(fragment.querySelector(".agency"), program);
   fragment.querySelector(".description").textContent = program.description;
   fragment.querySelector(".score-bar span").style.width = `${program.score}%`;
   fragment.querySelector(".score-label").textContent = `${program.score}%`;
@@ -1203,6 +1283,37 @@ function createProgramCard(program) {
   });
 
   return fragment;
+}
+
+function renderProgramIdentity(container, program) {
+  container.replaceChildren();
+  [
+    ["기관", program.agency, "agency-name"],
+    ["유형", program.type, "type-name"],
+    ["출처", program.source, `source-name source-${sourceSlug(program.source)}`],
+  ].forEach(([label, value, className]) => {
+    if (!value) return;
+    const item = document.createElement("span");
+    item.className = `identity-chip ${className}`;
+    const labelNode = document.createElement("strong");
+    labelNode.textContent = label;
+    item.append(labelNode, document.createTextNode(value));
+    container.appendChild(item);
+  });
+}
+
+function sourceSlug(source = "") {
+  const map = {
+    기업마당: "bizinfo",
+    "K-Startup": "kstartup",
+    소상공인24: "semas",
+    중소벤처기업진흥공단: "kosmes",
+    "신용보증기금 KODIT": "kodit",
+    "기술보증기금 KOTEC": "kibo",
+    고용24: "work24",
+    수출지원기반활용사업: "exportvoucher",
+  };
+  return map[source] || "default";
 }
 
 function formatDeadlineBadge(program) {

@@ -359,6 +359,23 @@ form button {
   margin-bottom: 18px;
 }
 
+.results-header h2 {
+  max-width: 860px;
+  margin-bottom: 8px;
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.18;
+  word-break: keep-all;
+}
+
+.results-header h2::after {
+  content: attr(data-context);
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .results-header select {
   min-width: 132px;
   min-height: 40px;
@@ -390,6 +407,52 @@ form button {
   border-color: var(--accent);
   background: #e4f4ee;
   color: var(--accent-dark);
+}
+
+.region-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 18px;
+}
+
+.region-filter-row label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.region-filter-row select {
+  min-width: 160px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #fff;
+  font-weight: 800;
+}
+
+.source-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 880px;
+}
+
+.source-pill,
+.source-date {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.source-date {
+  background: #f0f2ef;
+  color: var(--muted);
 }
 
 .insight-strip {
@@ -425,9 +488,38 @@ form button {
 
 .program-card {
   border: 1px solid var(--line);
+  border-left: 5px solid var(--accent);
   border-radius: 8px;
   padding: 18px;
   background: #fff;
+}
+
+.source-card-kstartup {
+  border-left-color: #2563eb;
+}
+
+.source-card-semas {
+  border-left-color: #16a34a;
+}
+
+.source-card-kosmes {
+  border-left-color: #7c3aed;
+}
+
+.source-card-kodit {
+  border-left-color: #b45309;
+}
+
+.source-card-kibo {
+  border-left-color: #0f766e;
+}
+
+.source-card-work24 {
+  border-left-color: #0369a1;
+}
+
+.source-card-exportvoucher {
+  border-left-color: #c2410c;
 }
 
 .program-card.needs-review {
@@ -507,8 +599,74 @@ form button {
 }
 
 .agency {
-  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
   font-weight: 800;
+}
+
+.identity-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 9px;
+  background: #f8faf8;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.identity-chip strong {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.source-bizinfo {
+  background: #e4f4ee;
+  color: #075a48;
+}
+
+.source-kstartup {
+  background: #e8f0ff;
+  color: #1d4ed8;
+}
+
+.source-semas {
+  background: #e8f7ed;
+  color: #166534;
+}
+
+.source-kosmes {
+  background: #f1e8ff;
+  color: #6d28d9;
+}
+
+.source-kodit {
+  background: #fff1dc;
+  color: #92400e;
+}
+
+.source-kibo {
+  background: #dff7f3;
+  color: #0f766e;
+}
+
+.source-work24 {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.source-exportvoucher {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.source-default {
+  background: #eef2f0;
+  color: var(--ink);
 }
 
 .description {

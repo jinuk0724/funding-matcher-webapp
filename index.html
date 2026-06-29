@@ -215,6 +215,7 @@
             <div>
               <p class="eyebrow">추천 결과</p>
               <h2 id="summaryTitle">한빛상점에 맞는 지원사업 0건</h2>
+              <div id="sourceSummary" class="source-summary" aria-label="검색 출처"></div>
             </div>
             <select id="sortMode" aria-label="정렬">
               <option value="score">적합도순</option>
@@ -232,6 +233,13 @@
             <button class="filter-chip" type="button" data-type="바우처">바우처</button>
             <button class="filter-chip" type="button" data-type="고용지원">고용지원</button>
             <button class="filter-chip" type="button" data-type="교육/컨설팅">교육/컨설팅</button>
+          </div>
+
+          <div class="region-filter-row">
+            <label for="regionFilter">지역별 보기</label>
+            <select id="regionFilter" aria-label="지역별 지원사업 보기">
+              <option value="all">전체 지역</option>
+            </select>
           </div>
 
           <div class="insight-strip">
