@@ -189,9 +189,10 @@ function inferIndustries(text) {
   if (/도소매|소매|도매|판매|유통|온라인몰|전자상거래/.test(text)) result.push("도소매업");
   if (/제조|공장|생산|스마트공장/.test(text)) result.push("제조업");
   if (/SW|소프트웨어|정보통신|ICT|AI|플랫폼|앱|데이터/.test(text)) result.push("IT/소프트웨어");
-  if (/콘텐츠|미디어|디자인|영상|게임|출판/.test(text)) result.push("콘텐츠");
-  if (/서비스|컨설팅|교육|의료|보건|한의원|병원|창업/.test(text)) result.push("서비스업");
-  return result.length ? [...new Set(result)] : ["서비스업"];
+  if (/콘텐츠|미디어|디자인|영상|게임|출판|예술|공연|문화예술/.test(text)) result.push("콘텐츠");
+  if (/의료|보건|한의원|병원|의원|치과|약국|요양기관|의료기관/.test(text)) result.push("보건/의료업");
+  if (/서비스|컨설팅|교육/.test(text) && result.length === 0) result.push("서비스업");
+  return result.length ? [...new Set(result)] : ["전업종"];
 }
 
 function inferBusinessTypes(text) {

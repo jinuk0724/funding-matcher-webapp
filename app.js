@@ -34,7 +34,7 @@ const TAX_TYPE_TO_INDUSTRY = {
   "전문, 과학 및 기술 서비스업": "서비스업",
   "사업시설 관리, 사업 지원 및 임대 서비스업": "서비스업",
   "교육 서비스업": "서비스업",
-  "보건업 및 사회복지 서비스업": "서비스업",
+  "보건업 및 사회복지 서비스업": "보건/의료업",
   "예술, 스포츠 및 여가관련 서비스업": "콘텐츠",
   "협회 및 단체, 수리 및 기타 개인 서비스업": "서비스업",
 };
@@ -267,7 +267,7 @@ function normalizeProgramFromApi(program) {
     agency: program.agency || "기업마당",
     type: program.type || "보조금",
     regions: Array.isArray(program.regions) && program.regions.length ? program.regions : ["전국"],
-    industries: Array.isArray(program.industries) && program.industries.length ? program.industries : ["서비스업"],
+    industries: refineProgramIndustries(program),
     businessTypes:
       Array.isArray(program.businessTypes) && program.businessTypes.length
         ? program.businessTypes
@@ -289,6 +289,40 @@ function normalizeProgramFromApi(program) {
   };
 }
 
+function refineProgramIndustries(program) {
+  const sourceIndustries = Array.isArray(program.industries) && program.industries.length
+    ? program.industries
+    : [];
+  const text = `${program.title || ""} ${program.description || ""} ${program.eligibilityText || ""}`;
+  const refined = new Set(sourceIndustries);
+
+  if (/한의원|의원|병원|치과|한방|의료|보건|약국|치료|진료|요양기관|의료기관/.test(text)) {
+    refined.add("보건/의료업");
+  }
+
+  if (/예술|공연|문화예술|예술서비스|콘텐츠|영상|게임|출판|미디어|캐릭터|웹툰/.test(text)) {
+    refined.add("콘텐츠");
+    refined.delete("서비스업");
+  }
+
+  if (/제조|공장|생산|스마트공장|소공인|뿌리기업|부품|시제품/.test(text)) {
+    refined.add("제조업");
+    refined.delete("서비스업");
+  }
+
+  if (/수출|해외|KOTRA|전시회|바이어|무역|통상/.test(text)) {
+    refined.add("수출기업");
+    refined.delete("서비스업");
+  }
+
+  if (/소프트웨어|SW|ICT|정보통신|AI|플랫폼|데이터|앱|웹/.test(text)) {
+    refined.add("IT/소프트웨어");
+    refined.delete("서비스업");
+  }
+
+  return refined.size ? [...refined] : ["전업종"];
+}
+
 function getProfile() {
   const data = new FormData(form);
 
@@ -303,6 +337,8 @@ function getProfile() {
       businessType: extracted.businessType || "개인사업자",
       region: confirmRegion.value || null,
       industry: confirmIndustry.value || null,
+      taxBusinessType: confirmTaxBusinessType.value || extracted.taxBusinessType || null,
+      taxBusinessItem: extracted.taxBusinessItem || null,
       revenue: null,
       employees: null,
       ownerAge: isYouth ? 34 : null,
@@ -486,7 +522,7 @@ function parseBusinessCertificate(text) {
     /업\s*태\s*[:：]?\s*([^\n]+)/,
   ]);
   const taxBusinessType = taxFields.type;
-  const taxBusinessItem = taxFields.item;
+  const taxBusinessItem = normalizeTaxBusinessItem(taxFields.item, text);
   const normalizedTaxBusinessType =
     normalizeTaxBusinessType(taxBusinessType) ||
     inferTaxBusinessType(`${taxBusinessType} ${taxBusinessItem} ${industryText} ${text}`);
@@ -641,7 +677,18 @@ function splitTaxIndustryLine(line) {
   const cleaned = cleanIndustryValue(line);
   if (!cleaned) return { type: "", item: "" };
 
-  const typeKeywords = ["도매 및 소매업", "숙박 및 음식점업", "제조업", "서비스업", "건설업", "정보통신업", "부동산업", "교육 서비스업"];
+  const typeKeywords = [
+    "보건업 및 사회복지 서비스업",
+    "도매 및 소매업",
+    "숙박 및 음식점업",
+    "제조업",
+    "서비스업",
+    "건설업",
+    "정보통신업",
+    "부동산업",
+    "교육 서비스업",
+    "보건업",
+  ];
   const matchedType = typeKeywords.find((keyword) => cleaned.includes(keyword));
   if (matchedType) {
     return {
@@ -657,7 +704,22 @@ function normalizeTaxBusinessType(value) {
   const cleaned = cleanIndustryValue(value);
   if (!cleaned) return "";
 
+  if (/보건|의료|한방|한의|병원|의원|약국/.test(cleaned)) {
+    return "보건업 및 사회복지 서비스업";
+  }
+
   return Object.keys(TAX_TYPE_TO_INDUSTRY).find((type) => cleaned.includes(type)) || "";
+}
+
+function normalizeTaxBusinessItem(value, fullText = "") {
+  const cleaned = cleanIndustryValue(value);
+  const evidence = `${cleaned} ${fullText}`;
+  if (/한의원/.test(evidence)) return "한의원";
+  if (/치과/.test(evidence)) return "치과의원";
+  if (/병원/.test(evidence)) return "병원";
+  if (/의원/.test(evidence)) return "의원";
+  if (/약국/.test(evidence)) return "약국";
+  return cleaned;
 }
 
 function inferTaxBusinessType(text) {
@@ -682,7 +744,7 @@ function inferTaxBusinessType(text) {
 
 function cleanIndustryValue(value) {
   return cleanExtractedValue(value)
-    .replace(/업태|종목|주업태|주종목/g, "")
+    .replace(/사업의종류|사업의 종류|업태|종목|주업태|주종목/g, "")
     .replace(/사업장|소재지|대표자|성명|개업연월일.*$/g, "")
     .trim();
 }
@@ -761,7 +823,7 @@ function inferIndustry(text) {
   if (/제조|가공|공장|생산/.test(value)) return "제조업";
   if (/소프트웨어|정보통신|개발|플랫폼|앱|웹/.test(value)) return "IT/소프트웨어";
   if (/콘텐츠|영상|디자인|출판|미디어/.test(value)) return "콘텐츠";
-  if (/한의원|의원|병원|치과|한방|의료|보건|약국|치료|진료/.test(value)) return "서비스업";
+  if (/한의원|의원|병원|치과|한방|의료|보건|약국|치료|진료/.test(value)) return "보건/의료업";
   if (/서비스|컨설팅|교육|관리/.test(value)) return "서비스업";
   return null;
 }
@@ -839,7 +901,7 @@ function renderNoEligiblePrograms() {
   prompt.className = "empty-state";
   prompt.innerHTML = `
     <strong>현재 조건에 맞는 지원사업이 없습니다.</strong>
-    <span>조건을 넓혀 볼 수 있도록 확인 필요 공고를 함께 표시했습니다. 지역, 업종, 창업 여부를 다시 확인해보세요.</span>
+    <span>대상 조건이 맞지 않는 공고는 표시하지 않습니다. 지역, 업종, 창업 여부를 다시 확인하거나 다른 유형을 선택해보세요.</span>
   `;
   resultList.appendChild(prompt);
 }
@@ -847,7 +909,7 @@ function renderNoEligiblePrograms() {
 function matchProgram(profile, program) {
   const checks = [
     makeCheck("region", "지역", profile.region, program.regions, 24, true),
-    makeCheck("industry", "업종", profile.industry, program.industries, 20, true),
+    makeIndustryCheck(profile, program),
     makeCheck("businessType", "사업자 유형", profile.businessType, program.businessTypes, 10, true),
     makeMaxCheck("revenue", "연 매출", profile.revenue, program.maxRevenue, 12, false, formatRevenue),
     makeMaxCheck("employees", "상시근로자", profile.employees, program.maxEmployees, 10, false, (v) => `${v}명`),
@@ -895,7 +957,7 @@ function makeCheck(key, label, value, allowed, weight, required) {
     };
   }
 
-  const pass = allowed.includes("전국") || allowed.includes(value);
+  const pass = allowed.includes("전국") || allowed.includes("전업종") || allowed.includes(value);
   return {
     key,
     label,
@@ -905,6 +967,59 @@ function makeCheck(key, label, value, allowed, weight, required) {
     passLabel: `${value} ${label} 조건 충족`,
     failLabel: `${value} ${label}은 대상이 아님`,
   };
+}
+
+function makeIndustryCheck(profile, program) {
+  const allowed = program.industries || [];
+  if (!profile.industry) {
+    return {
+      key: "industry",
+      label: "업종",
+      weight: 26,
+      required: true,
+      status: "unknown",
+      unknownLabel: "업종 확인 필요",
+    };
+  }
+
+  const pass = allowed.includes("전업종") || allowed.includes(profile.industry);
+  const strictMiss = getStrictIndustryMiss(profile, program);
+
+  return {
+    key: "industry",
+    label: "업종",
+    weight: 26,
+    required: true,
+    status: pass && !strictMiss ? "pass" : "fail",
+    passLabel: `${profile.industry} 업종 조건 충족`,
+    failLabel: strictMiss || `${profile.industry} 업종은 대상이 아님`,
+  };
+}
+
+function getStrictIndustryMiss(profile, program) {
+  const text = `${program.title || ""} ${program.description || ""} ${program.eligibilityText || ""}`;
+
+  if (profile.industry === "보건/의료업") {
+    const isHealthcareProgram = /의료|보건|한의|병원|의원|약국|요양기관|의료기관/.test(text);
+    const isGeneralIndustry = (program.industries || []).includes("전업종");
+    if (!isHealthcareProgram && !isGeneralIndustry) {
+      return "보건/의료업 대상 공고가 아님";
+    }
+  }
+
+  if (/예술|공연|문화예술|콘텐츠|영상|게임|출판|미디어/.test(text) && profile.industry !== "콘텐츠") {
+    return "예술/콘텐츠 분야 대상 공고";
+  }
+
+  if (/제조|공장|생산|스마트공장|소공인|뿌리기업|부품/.test(text) && profile.industry !== "제조업") {
+    return "제조업 분야 대상 공고";
+  }
+
+  if (/수출|해외전시|바이어|무역|통상촉진/.test(text) && !profile.exports) {
+    return "수출기업 대상 공고";
+  }
+
+  return "";
 }
 
 function makeMaxCheck(key, label, value, maxValue, weight, required, format) {
@@ -980,20 +1095,7 @@ function getVisibleMatches() {
     (program) => state.typeFilter === "all" || program.type === state.typeFilter,
   );
   const eligibleOrReview = filtered.filter((program) => program.status !== "not_eligible");
-  if (eligibleOrReview.length > 0) return eligibleOrReview;
-
-  return [...filtered]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8)
-    .map((program) => ({
-      ...program,
-      status: "needs_review",
-      review: [
-        "현재 입력 조건과 정확히 맞지는 않지만 확인해볼 만한 공고입니다",
-        ...program.missing.slice(0, 2),
-      ],
-      missing: [],
-    }));
+  return eligibleOrReview;
 }
 
 function statusRank(status) {
