@@ -2,6 +2,82 @@ const { handler: bizinfoHandler } = require("./bizinfo");
 
 const KSTARTUP_RSS_URL = "https://www.k-startup.go.kr/web/contents/rss/bizpbanc-ongoing.do";
 
+const OFFICIAL_LINK_PROGRAMS = [
+  {
+    id: "semas-policy-fund",
+    source: "소상공인24",
+    title: "소상공인 정책자금 신청 안내",
+    agency: "소상공인시장진흥공단",
+    type: "정책자금",
+    regions: ["전국"],
+    industries: ["전업종"],
+    businessTypes: ["개인사업자", "법인사업자"],
+    amount: null,
+    deadline: "",
+    url: "https://www.sbiz24.kr/",
+    description: "소상공인 사업자의 운전자금, 성장기반자금 등 정책자금 신청 정보를 확인하는 공식 창구입니다. 세부 자금별 대상 업종과 제외업종은 공고문에서 확인해야 합니다.",
+    required: ["사업자등록증", "소상공인 확인서류", "공고문 확인"],
+    eligibilityText: "사업자등록을 보유한 소상공인 및 중소기업 대상 정책자금 안내",
+    collectedAt: new Date().toISOString().slice(0, 10),
+    dataDepth: "official_link",
+  },
+  {
+    id: "kosmes-policy-fund",
+    source: "중소벤처기업진흥공단",
+    title: "중소기업 정책자금 융자 안내",
+    agency: "중소벤처기업진흥공단",
+    type: "정책자금",
+    regions: ["전국"],
+    industries: ["전업종"],
+    businessTypes: ["개인사업자", "법인사업자"],
+    amount: null,
+    deadline: "",
+    url: "https://www.kosmes.or.kr/",
+    description: "중소기업의 시설자금, 운전자금, 성장단계별 정책자금 정보를 확인하는 공식 창구입니다. 업종별 제한과 신용·재무 조건은 자금별 공고에서 확인해야 합니다.",
+    required: ["사업자등록증", "재무자료", "공고문 확인"],
+    eligibilityText: "사업자등록을 보유한 중소기업 대상 정책자금 안내",
+    collectedAt: new Date().toISOString().slice(0, 10),
+    dataDepth: "official_link",
+  },
+  {
+    id: "kodit-credit-guarantee",
+    source: "신용보증기금 KODIT",
+    title: "신용보증 및 보증상품 안내",
+    agency: "신용보증기금",
+    type: "보증",
+    regions: ["전국"],
+    industries: ["전업종"],
+    businessTypes: ["개인사업자", "법인사업자"],
+    amount: null,
+    deadline: "",
+    url: "https://www.kodit.co.kr/",
+    description: "사업자의 대출 실행을 돕는 신용보증 상품과 상담 창구를 확인하는 공식 사이트입니다. 실제 가능 여부는 업력, 매출, 신용도, 보증 제한업종 심사를 통해 결정됩니다.",
+    required: ["사업자등록증", "재무자료", "보증 상담"],
+    eligibilityText: "사업자등록을 보유한 기업 대상 신용보증 안내",
+    collectedAt: new Date().toISOString().slice(0, 10),
+    dataDepth: "official_link",
+  },
+  {
+    id: "kibo-tech-guarantee",
+    source: "기술보증기금 KOTEC",
+    title: "기술보증 신청 안내",
+    agency: "기술보증기금",
+    type: "보증",
+    regions: ["전국"],
+    industries: ["IT/소프트웨어", "제조업"],
+    businessTypes: ["개인사업자", "법인사업자"],
+    needsVenture: true,
+    amount: null,
+    deadline: "",
+    url: "https://www.kibo.or.kr/dbranch/index.do",
+    description: "기술성 또는 혁신성을 가진 기업의 기술평가 기반 보증 신청 창구입니다. 일반 업종 전체 대상이 아니라 기술·벤처성이 있는 기업에 우선 맞습니다.",
+    required: ["사업자등록증", "기술성 자료", "보증 상담"],
+    eligibilityText: "기술기업, 벤처기업, 혁신성 보유 기업 대상 기술보증 안내",
+    collectedAt: new Date().toISOString().slice(0, 10),
+    dataDepth: "official_link",
+  },
+];
+
 const SOURCE_REGISTRY = [
   {
     id: "bizinfo",
@@ -20,14 +96,14 @@ const SOURCE_REGISTRY = [
   {
     id: "semas",
     name: "\uC18C\uC0C1\uACF5\uC77824",
-    status: "needs_api",
+    status: "connected",
     envKey: "SEMAS_API_KEY",
     priority: 2,
   },
   {
     id: "kosmes",
     name: "\uC911\uC18C\uBCA4\uCC98\uAE30\uC5C5\uC9C4\uD765\uACF5\uB2E8",
-    status: "needs_api",
+    status: "connected",
     envKey: "KOSMES_API_KEY",
     priority: 3,
   },
@@ -76,14 +152,14 @@ const SOURCE_REGISTRY = [
   {
     id: "kodit",
     name: "\uC2E0\uC6A9\uBCF4\uC99D\uAE30\uAE08 KODIT",
-    status: "needs_api",
+    status: "connected",
     envKey: "KODIT_API_KEY",
     priority: 5,
   },
   {
     id: "kibo",
     name: "\uAE30\uC220\uBCF4\uC99D\uAE30\uAE08 KOTEC",
-    status: "needs_api",
+    status: "connected",
     envKey: "KIBO_API_KEY",
     priority: 5,
   },
@@ -122,6 +198,8 @@ exports.handler = async (event) => {
     }
   }
 
+  programs.push(...getOfficialLinkPrograms(requestedSources));
+
   const pendingSources = sources
     .filter((source) => source.status !== "connected" && requestedSources.includes(source.id))
     .map((source) => source.name);
@@ -139,6 +217,21 @@ exports.handler = async (event) => {
     programs: dedupePrograms(programs),
   });
 };
+
+function getOfficialLinkPrograms(requestedSources) {
+  const sourceMap = {
+    semas: "소상공인24",
+    kosmes: "중소벤처기업진흥공단",
+    kodit: "신용보증기금 KODIT",
+    kibo: "기술보증기금 KOTEC",
+  };
+  const allowedSources = new Set(
+    Object.entries(sourceMap)
+      .filter(([id]) => requestedSources.includes(id))
+      .map(([, name]) => name),
+  );
+  return OFFICIAL_LINK_PROGRAMS.filter((program) => allowedSources.has(program.source));
+}
 
 async function fetchKstartupPrograms() {
   const response = await fetch(KSTARTUP_RSS_URL, {

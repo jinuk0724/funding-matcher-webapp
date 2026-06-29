@@ -279,6 +279,7 @@ function normalizeProgramFromApi(program) {
     needsStartup: Boolean(program.needsStartup),
     needsExports: Boolean(program.needsExports),
     needsFemaleOwned: Boolean(program.needsFemaleOwned),
+    needsVenture: Boolean(program.needsVenture),
     amount: program.amount ?? null,
     deadline: program.deadline || "",
     url: program.url || "https://www.bizinfo.go.kr/",
@@ -921,6 +922,7 @@ function matchProgram(profile, program) {
     makeBooleanCheck("startup", "창업기업", profile.startup, program.needsStartup, 8),
     makeBooleanCheck("exports", "수출기업", profile.exports, program.needsExports, 8),
     makeBooleanCheck("femaleOwned", "여성기업", profile.femaleOwned, program.needsFemaleOwned, 8),
+    makeBooleanCheck("venture", "기술/벤처기업", profile.venture, program.needsVenture, 8),
   ].filter(Boolean);
 
   const hardFailed = checks.filter((check) => check.required && check.status === "fail");
@@ -1142,7 +1144,7 @@ function renderMatches(companyName = getProfile().companyName) {
     sorted.filter((program) => program.daysLeft >= 0 && program.daysLeft <= 14).length,
   );
   document.querySelector("#loanCount").textContent = String(
-    available.filter((program) => program.type === "정책자금").length,
+    available.filter((program) => program.type === "정책자금" || program.type === "보증").length,
   );
 }
 
