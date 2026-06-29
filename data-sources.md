@@ -17,6 +17,29 @@
 | 보증 | 신용보증기금 KODIT | 5 | 보증상품 정보 수집 | 실제 신청 가능성 판단은 별도 요건 필요 |
 | 보증 | 기술보증기금 KOTEC | 5 | 기술보증/R&D 연계 정보 수집 | 기술성/업종 판단 필요 |
 
+## 현재 구현 상태
+
+- `기업마당`: 실제 API 연동 완료
+- `/api/programs`: 여러 데이터 소스를 합치기 위한 통합 API 추가
+- 나머지 출처: API 키/공식 엔드포인트 확인 후 같은 어댑터 구조에 추가 예정
+
+## 환경변수 예약명
+
+| 출처 | 환경변수 |
+|---|---|
+| 기업마당 | `BIZINFO_API_KEY` |
+| K-Startup | `KSTARTUP_API_KEY` |
+| 소상공인24 | `SEMAS_API_KEY` |
+| 중소벤처기업진흥공단 | `KOSMES_API_KEY` |
+| SMTECH | `SMTECH_API_KEY` |
+| 고용24 | `WORK24_API_KEY` |
+| 보조금24/정부24 | `GOV24_API_KEY` |
+| 복지로 | `BOKJIRO_API_KEY` |
+| e나라도움 | `GOSIMS_API_KEY` |
+| 서민금융진흥원 | `KINFA_API_KEY` |
+| 신용보증기금 | `KODIT_API_KEY` |
+| 기술보증기금 | `KIBO_API_KEY` |
+
 ## 1차 연동 원칙
 
 - 실제 API가 있는 곳부터 붙인다.
@@ -45,4 +68,3 @@
   collectedAt: "YYYY-MM-DD"
 }
 ```
-

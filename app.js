@@ -238,7 +238,7 @@ async function getSupportPrograms() {
   if (state.programs) return state.programs;
 
   try {
-    const response = await fetch("./api/bizinfo?searchCnt=100&pageUnit=50&pageIndex=1", {
+    const response = await fetch("./api/programs?sources=all&searchCnt=100&pageUnit=50&pageIndex=1", {
       headers: { Accept: "application/json" },
     });
     if (!response.ok) throw new Error(`API ${response.status}`);
@@ -247,7 +247,10 @@ async function getSupportPrograms() {
       throw new Error("No programs from Bizinfo API.");
     }
     state.programs = data.programs.map(normalizeProgramFromApi);
-    state.programsSource = `기업마당 · ${data.fetchedAt ? data.fetchedAt.slice(0, 10) : "실시간"}`;
+    const connectedSources = Array.isArray(data.sources)
+      ? data.sources.filter((source) => source.status === "connected").map((source) => source.name)
+      : ["기업마당"];
+    state.programsSource = `${connectedSources.join("+")} · ${data.fetchedAt ? data.fetchedAt.slice(0, 10) : "실시간"}`;
     return state.programs;
   } catch (error) {
     state.programs = supportPrograms;
